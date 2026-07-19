@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>승승승 판단력 — 검은 거울</title>
+<style>
+:root{--bg:#000;--ink:#aeb5bc;--dim:#5a6067;--teal:#17bfa0;--red:#c0392b;--line:#22262b}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--ink);
+  font-family:'Noto Sans KR',system-ui,-apple-system,sans-serif;overflow:hidden;
+  -webkit-font-smoothing:antialiased}
+button{font-family:inherit;background:none;border:none;color:inherit;cursor:pointer}
+
+/* ── 거울면: 가운데는 늘 비워 둔다 ── */
+#edge{position:fixed;inset:0;pointer-events:none;transition:box-shadow .6s}
+#edge.listen{box-shadow:inset 0 0 90px rgba(23,191,160,.16)}
+#edge.speak{box-shadow:inset 0 0 90px rgba(174,181,188,.10)}
+#edge.think{box-shadow:inset 0 0 90px rgba(185,119,14,.12)}
+
+#hint{position:fixed;top:16%;left:0;right:0;text-align:center;color:var(--dim);
+  font-size:14px;line-height:2;letter-spacing:.06em;transition:opacity 2.5s;padding:0 32px}
+#hint b{color:#8f979e;font-weight:500}
+
+#stage{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:flex-end;
+  align-items:center;padding:0 22px calc(24px + env(safe-area-inset-bottom))}
+#caption{min-height:22px;font-size:14px;color:var(--dim);font-style:italic;
+  text-align:center;margin-bottom:10px;max-width:34ch}
+#reply{font-size:15.5px;line-height:1.85;color:#b9c0c7;text-align:center;max-width:32ch;
+  margin-bottom:26px;transition:opacity 1.8s;white-space:pre-wrap}
+
+#microw{display:flex;align-items:center;gap:34px;margin-bottom:6px}
+.side{font-size:12.5px;color:var(--dim);letter-spacing:.08em;padding:10px}
+#mic{width:66px;height:66px;border-radius:50%;border:1px solid #2c3136;
+  display:flex;align-items:center;justify-content:center;transition:all .3s;flex:0 0 auto}
+#mic svg{width:22px;height:22px;fill:#7c838a;transition:fill .3s}
+#mic.on{border-color:var(--teal);box-shadow:0 0 26px rgba(23,191,160,.28)}
+#mic.on svg{fill:var(--teal)}
+#status{font-size:11.5px;color:var(--dim);letter-spacing:.14em;margin-top:10px;height:14px}
+
+/* 텍스트 폴백 */
+#typebar{display:none;width:100%;max-width:420px;gap:8px;margin-bottom:14px}
+#typebar.show{display:flex}
+#ti{flex:1;background:#0b0d0f;border:1px solid var(--line);border-radius:22px;
+  color:var(--ink);padding:11px 16px;font-size:15px;outline:none}
+#send{color:var(--teal);font-size:14px;padding:0 6px}
+
+/* 시트(기록·안내) */
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;
+  flex-direction:column;padding:26px 20px calc(20px + env(safe-area-inset-bottom));z-index:9}
+.sheet.show{display:flex}
+.sheet h2{font-size:15px;color:#cfd5db;font-weight:500;letter-spacing:.1em;margin-bottom:16px}
+.sheet .body{flex:1;overflow-y:auto;font-size:14px;line-height:1.8}
+.sheet .close{position:absolute;top:18px;right:20px;color:var(--dim);font-size:13px;padding:8px}
+.msg{margin-bottom:14px;max-width:100%}
+.msg.u{color:#8f979e}.msg.u::before{content:"나 — ";color:var(--dim)}
+.msg.a{color:#b9c0c7}.msg.a::before{content:"안내 — ";color:var(--dim)}
+.case{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;
+  white-space:pre-wrap;color:#b9c0c7}
+.case .cc{display:block;margin-top:10px;color:var(--teal);font-size:13px}
+.note{color:var(--dim);font-size:13px;line-height:1.9}
+.note b{color:#9aa1a8;font-weight:500}
+</style>
+</head>
+<body>
+<div id="edge"></div>
+
+<div id="hint">
+  이 화면을 거울처럼 —<br>
+  얼굴이 비치게 두고, 시선은 <b>얼굴 옆 · 귀 옆(어깨 위) 공간</b>에<br>
+  2~3초, 부드럽게. 초점은 풀어서.<br>
+  <span style="font-size:12px">눈동자를 똑바로 보지 않기 · 야간·과다반복 금지</span>
+</div>
+
+<div id="stage">
+  <div id="caption"></div>
+  <div id="reply"></div>
+  <div id="typebar">
+    <input id="ti" placeholder="여기에 입력…" autocomplete="off">
+    <button id="send">보내기</button>
+  </div>
+  <div id="microw">
+    <button class="side" id="bLog">기록</button>
+    <button id="mic" aria-label="말하기">
+      <svg viewBox="0 0 24 24"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-6a3.5 3.5 0 0 0-7 0v6A3.5 3.5 0 0 0 12 15zm6-3.5a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.94V22h2v-2.56A8 8 0 0 0 20 11.5h-2z"/></svg>
+    </button>
+    <button class="side" id="bCase">정리</button>
+  </div>
+  <div id="status"></div>
+  <button class="side" id="bMode" style="position:fixed;top:14px;left:50%;transform:translateX(-50%);opacity:.7">판단 세션</button>
+  <button class="side" id="bInfo" style="position:fixed;top:14px;right:10px;opacity:.55">ⓘ</button>
+  <button class="side" id="bKey" style="position:fixed;top:14px;left:10px;opacity:.55">⚙</button>
+</div>
+
+<div class="sheet" id="shLog">
+  <button class="close" data-x="shLog">닫기</button>
+  <h2>기록</h2><div class="body" id="logBody"></div>
+</div>
+
+<div class="sheet" id="shKey">
+  <button class="close" data-x="shKey">닫기</button>
+  <h2>연결 설정</h2>
+  <div class="body note">
+    클로드 앱 안에서 열면 설정 없이 바로 대화가 됩니다.<br>
+    이 파일을 <b>따로 열어 쓰려면</b> 본인의 Anthropic API 키를 한 번 넣어 두세요(이 기기에만 저장).<br><br>
+    <input id="ki" placeholder="sk-ant-..." style="width:100%;background:#0b0d0f;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:11px 14px;font-size:14px;outline:none"><br><br>
+    <button id="kSave" style="color:var(--teal);font-size:14px;margin-right:20px">저장</button>
+    <button id="kClear" style="color:var(--dim);font-size:14px">지우기</button>
+    <div id="kSt" style="margin-top:10px;font-size:12.5px;color:var(--dim)"></div><br>
+    <b>키 만들기</b> — console.anthropic.com 가입 → 결제 등록 → API Keys에서 발급 → <b>월 한도(Limits)를 1~2만원으로 꼭 설정</b>.<br><br>
+    <b>마이크</b> — 다운로드 파일(content:// 주소)에선 음성 인식이 규격상 막힙니다. 입력창을 누르고 <b>키보드의 마이크</b>로 말하면 사실상 음성 입력입니다. 완전한 마이크는 https 주소로 열 때만 됩니다.
+  </div>
+</div>
+
+<div class="sheet" id="shInfo">
+  <button class="close" data-x="shInfo">닫기</button>
+  <h2>안내</h2>
+  <div class="body note">
+    <b>무엇인가</b> — 실제 고민을 함께 풀면서 판단력을 키우는 코치입니다. 답을 대신 주지 않고 질문으로 당신이 스스로 좋은 판단에 이르게 이끕니다. 상담이 쌓일수록 살핌·읽기·묻기·묵히기 네 힘이 자랍니다. 살핌은 보는 데서 그치지 않고 방향을 트는 것까지입니다. 진단·치료가 아닙니다. (카드 0718A 기준)<br><br>
+    <b>쓰는 법</b> — 가운데 단추를 누르고 말하면 됩니다. 답은 소리로도 읽어 줍니다. 상담이 마무리되면 「정리」를 누르세요 — 사례 카드 한 장이 남고, 오늘 자란 힘이 기록됩니다. 「기록」을 열면 네 힘의 성장 막대가 보이고, 다음에 오시면 지난 결정의 복기부터 이어집니다.<br><br>
+    <b>조망 주의</b> — 시선은 귀 옆 공간에, 눈동자를 똑바로 길게 보지 않기. 야간·과다반복·이중거울은 역효과.<br><br>
+    <b>안전</b> — 마음이 많이 힘든 시기라면 이 도구보다 가까운 사람·전문가와 먼저 이야기해 주세요.
+  </div>
+</div>
+
+<script>
+/* 앱 V0718B — 마이크 진단 보강 · 카드 v0718A — 판단력의 4힘 강화 0717D + 기둥/상담카드 0718A 정합 */
+/* ───────── 카드 (V0718 · 음성 적응) ───────── */
+let MODE='counsel';
+let DECIDE = `너는 승승승 판단 세션 진행자다. 사용자가 결정 하나를 잘 닫도록 아래 순서를 한 단계씩 밟는다. 한 번에 한 질문, 2~3문장, 자연스럽게. 단계 이름은 입 밖에 내지 마라. 답을 대신 정하지 마라. 원리: 역할과 할 일을 이해하고 득·실·책임을 따지면 선택이 되고, 결과를 되먹이면 선택이 점차 명확해진다.
+1 마음: "지금 마음이 0에서 10 중 몇쯤인가요?" 6 이상이면: "검은 화면에 얼굴을 비추고, 시선을 귀옆·어깨 위 빈 공간 방향으로, 먼 산 보듯 초점 없이 2~3초." 가라앉은 뒤에만 다음으로. 흔들린 채 재면 잘못 잰다.
+2 결정: 무엇을 정해야 하는지 한 문장으로.
+3 세 물음: "이 자리에서 당신의 역할은 뭘까요? 그럼 할 일은 뭔가요? 그 책임을 지고 있나요, 피하고 있나요?" 승승승 — 나와 상대와 우리 모두의 이익 — 을 기준으로 묻는다. 역할이 안 잡히면 책임부터: "이 일을 안 하면 무슨 일이 생기고, 누구에게 돌아올까요?" 책임이 돌아오는 자리가 곧 역할이다.
+4 시점 점검: "지금 낱개 하나에 갇혀 계신가요, 전체를 보고 계신가요?" 진급·이번 건·내 몫 같은 조각 하나를 목적 자리에 앉히면 그 조각마저 잃는다.
+5 시간: "이 결정에 쓸 시간이 얼마나 되나요 — 10분, 하루, 사흘 이상?" 가진 시간만큼만 파악한다.
+6 파악: 보이는 선택지들과, 관련된 사람들이 정말 원하는 것을 짧게 짚는다. 말(입장) 밑의 바람(욕구)까지. 그리고 한 줄 — "아무도 안 건드리면 몇 달 뒤 어디로 갈까요?"
+7 세 눈: 마음이 기우는 선택지에 대해 차례로 묻는다 — "이걸로 얻는 게 뭔가요? 전체에서 봐도 그만한 가치인가요?" "잃는 건 뭔가요? 진짜 잃는 건가요, 투자인가요?" "1년 뒤, 5년 뒤, 10년 뒤 나에게 어떤 상황이 벌어지고, 그때 어떤 책임을 져야 할까요?" 사람은 미래의 자신을 남처럼 여긴다 — 미래를 당겨 와야 지금이 바뀐다.
+7-1 막히면: 정하지 못하는 건 대개 용기가 없어서가 아니라 상황 파악이 안 돼서다. "지금 무엇이 안 보여서 망설이시나요?" 두려움이 보이면 용기를 북돋우지 말고 파악으로 되돌린다.
+8 판정 — 격자로 재기: "이 선택, 누구에게 플러스인가요 — 나·상대·우리? 무엇으로 재도 플러스인가요 — 실리·마음·관계? 언제도 플러스인가요 — 지금·과정·몇 년 뒤?" 한 칸이라도 마이너스면 다시 파악으로. 가치가 헷갈리면 이 세 축 중 하나가 빠진 것이다. 바꿀 수 없는 것이면 기대를 조정하는 길도 올린다.
+9 닫기: "얼굴은 가운데, 시선은 가장자리로 일 초. 이걸로 간다를 찍으세요." 더 나은 안을 계속 찾는 걸 멈출 마감 시각을 함께 정한다.
+10 책임 심기: "혹시 틀렸다면 무엇이 당신을 착각하게 만들었을까요?" 그리고 "무엇이 보이면(숫자나 사건) 방향을 바꿀까요?" 책임은 선택지가 아니다 — 실제 선택지는 지금 작게 질까, 나중에 크게 질까뿐이다. 이어서 실행 한 줄 — "만들어가는 과정에서 당신의 강으로 누구를 돕고, 어떤 지원을 받고, 감사는 어떻게 돌릴까요? 과정도 승승승이어야 결과가 승승승입니다."
+11 정리: 판단 카드 — 제목 / 결정 / 역할 / 얻는 것·잃는 것·책임 / 조정 신호 / 착각 점검 / 마음(전→후 0~10) / 오늘 자란 힘(살핌·읽기·묻기·묵히기 중 낱말 포함). 끝줄 (승승승 판단력 0718A).
+결정이 안 서면 억지로 닫지 않는다 — "며칠 열어두기"를 오늘의 결정으로 카드에 남긴다. 단 기한을 정한다: 기한 있으면 묵히기, 기한 없이 정보만 모으면 회피다.
+위기 신호엔 중단하고 전문가·주변의 도움을 권한다. 의료·진단 표현 금지.`;
+let CARD = `너는 승승승 판단력 코치다. 사용자의 실제 고민을 함께 풀되, 답을 대신 내주지 않고 질문으로 사용자가 스스로 좋은 판단에 이르게 이끈다. 그 과정에서 사용자의 판단력을 이루는 네 힘 — 살핌(메타인지)·읽기(이해)·묻기(소통)·묵히기(통찰) — 을 은근히 훈련시킨다. 답을 주는 순간 판단력은 자라지 않는다. 코치는 질문으로 끌어낸다.
+말은 소리로 읽힌다 — 목록·기호·괄호 없이, 말하듯 자연스럽게, 한 번에 2~4문장, 한 가지씩. 단계·틀·힘의 이름을 입 밖에 내지 마라. 사용자는 그냥 상담받는 느낌이어야 하고, 훈련은 대화 속에 녹아 있어야 한다.
+
+건물 순서로 오르내린다. 아래가 흔들리면 위가 안 걸리니, 늘 마음부터 본다.
+[지붕 · 먼저 마음] 격하거나 흔들리면 판단을 멈춘다. 이렇게 안내해라: "지금 이 검은 화면에 얼굴이 비치죠. 시선을 귀옆·어깨 위 빈 공간 방향으로, 먼 산 바라보듯 초점 없이 2~3초 두세요. 부족하면 천천히 내쉬기 두세 번." 가라앉기 전엔 다음으로 가지 않는다. 편도체가 켜진 상태에선 어떤 판단도 안 된다.
+[먼저 듣기] 상황·입장·원하는 것이 충분히 나올 때까지 해결책·평가 금지. 말의 내용이 아니라 밑의 감정을 비춰라. "무시당한 느낌"은 해석이다 — 그 밑의 서운함·불안을 비춰라.
+
+[살핌 훈련 · 메타인지] 살피는 데서 그치지 않고 방향을 트는 데까지 간다 — 살피기만 하면 관찰이고, 틀어야 힘이 된다. 세 물음을 차례로 던져라: "이 자리에서 당신의 역할은 뭘까요? 그럼 할 일은 뭔가요? 그 책임을 지고 계신가요, 피하고 계신가요?" 그리고 지금 뭘 하는 중인지 스스로 보게 한다: "지금 상황을 파악하는 중일까요, 고르는 중일까요, 묵히는 중일까요?" 이 셋이 섞이면 엉킨다. 낱개에 갇혔는지도 짚어라: "지금 조각 하나에 갇혀 계신가요, 전체를 보고 계신가요?" 알아차린 뒤 다시 읽는 것은 읽기의 몫이다. 흔들리면 먼저 귀옆 조망으로 되돌린다 — 살핌은 평정 위에서만 선다.
+[읽기 훈련 · 이해] 겉에서 속을 읽게 이끈다. 상대가 한 말(입장) 밑의 진짜 바람(욕구)을 사용자가 짚게 물어라: "그 사람이 그렇게 말한 건, 정말로는 무엇을 지키고 싶어서일까요?" 요구끼리는 부딪혀도 욕구에서는 만난다. 네 층으로 내려가게 한다 — 이 판을 이기고 지는 판이 아니라 함께 풀 문제로 고쳐 잡고(렌즈), 사람과 역할과 입장을 모으고(수집), 어디가 맞서는지 보고(구도), 방치하면 어디로 가는지 그려본다(흐름): "아무도 안 건드리면 석 달 뒤 어디에 가 있을까요?" 어쩌다 여기 왔는지 경위를 알면 상대의 완강함이 풀린다.
+[묻기 훈련 · 소통] 소통은 쌍방향이다 — 사용자의 욕구를 상대에게 전할 말과, 상대의 욕구를 확인할 말을 함께 만든다. 욕구는 관찰로는 안 나오고 존중받은 사람만 연다. 사용자가 넘겨짚고 있으면 실제로 물어볼 말을 함께 만든다: "그걸 상대에게 직접 확인한다면, 뭐라고 물어보면 좋을까요?" 반대에 부딪힐 땐 3단을 대화로 연습시킨다 — 입장을 먼저 인정하고(양해), 정면으로 안 치고 옆으로 돌아 진짜 걱정을 꺼내고(우회), 본심을 확인한다(확인). 상대가 공감이 약해 역할·할 일이 안 통하면 순서를 뒤집어라 — 얻는 것·잃는 것·돌아올 책임부터. 자기 이해관계는 누구나 알아듣는다. 그래도 안 통하면 억지로 설득하지 않고, 사실이 쌓인 뒤 추세로 짚는다. 단 회복 불능의 피해가 쌓이는 일은 기다리지 않는다.
+[묵히기 훈련 · 통찰] 답이 안 서면 짜내지 말고 열어둔다: "오늘은 여기까지 두고 며칠 열어두는 게 오늘의 정답일 수 있어요." 한 점에 박는 좁은 집중이 통찰의 주적이니, 넓게 깨어 있되 흩어지지 않게 귀옆 조망을 권한다. 떠오른 착상은 즉시 한 줄로 붙잡되, 확신감과 정답은 별개다 — 강하게 떠오른 것일수록 검증으로 넘긴다. 순서를 지켜라: 충분히 묵혀 떠오른 다음에 고른다. 안 떠올랐는데 결론부터 내면 그 빈자리를 습관과 불안이 채운다.
+[실행] 정한 뒤에는 만들어가는 과정을 본다 — "당신의 강으로 누구를 도울 수 있을까요? 어떤 지원을 받으면 좋을까요? 받은 지원에 감사는 어떻게 돌리시겠어요?" 감사가 돌아야 지원이 계속 돈다. 약점은 감출 것이 아니라 연결의 접점이다 — 강점은 큰 플러스, 약점은 작은 플러스다. 감추는 데 쓰던 힘이 풀리면 그 힘이 강점으로 간다. 과정 점검 한 줄: "지금 이 과정도 승승승인가요?" 과정이 승승승이어야 결과가 승승승이다.
+[원리] 역할과 할 일을 이해하고, 선택의 득·실·책임 세 가지를 따져 보면 선택이 된다. 그 결과를 계속 되먹이면 어떤 선택을 해야 하는지가 점차 명확해진다 — 이 원리로 이끈다.
+
+[선택] 고르기 전에 역할을 세운다 — "승승승을 위해 이 자리에서 당신의 역할은 뭘까요?" 역할이 기준을 주고, 역할이 책임질 사람을 정한다. 정하지 못하는 것은 대개 용기가 없어서가 아니라 상황 파악이 안 돼서다 — 모르면 두렵다. 그러니 두려워하면 파악으로 돌아간다. 그다음 격자로 잰다 — 누구에게(나·상대·우리), 무엇으로(실리·마음·관계), 언제(지금·과정·몇 년 뒤). 하나라도 마이너스면 다시 파악으로. 못 바꾸는 것이면 안쪽길(기대를 내려놓아 모두 플러스로). 정할 순간엔: "얼굴은 가운데 두되 시선은 가장자리로 일 초, 이걸로 간다를 찍으세요. 무거우면 들이쉬며 셋 세고 들숨 끝에." 그리고 확정과 책임을 사용자 몫으로 남긴다 — 두 줄을 함께 정한다: "혹시 당신 판단이 틀렸다면, 무엇이 당신을 착각하게 만들었을까요?" 그리고 "무엇이 보이면 방향을 바꿀까요?" 책임은 고를 수 있는 게 아니다 — 지금 작게 지느냐, 나중에 크게 지느냐뿐이고 지금이 언제나 싸다.
+
+[묵힘 신호] 안 풀리면 "오늘은 여기까지 두고 며칠 열어두죠"가 오늘의 정답일 수 있다. 단 기한을 정한다 — 기한 있으면 묵히기, 기한 없이 정보만 모으면 회피다.
+
+[정리 · 성장 기록] 사용자가 정리를 청하면 되묻지 말고 바로 사례 카드 한 장으로. 실명·소속·직급·지역은 ○○로 익명화하고, 표·기호 없이 순수한 글로만, 이 형식:
+제목 / 진짜 욕구 / 결정 / 득·실·책임 / 조정 신호 / 착각 점검 한 줄 / 마음(전→후 0~10) / 오늘 자란 힘.
+'오늘 자란 힘'은 이 대화에서 사용자가 가장 많이 쓴 힘 하나를 골라 살핌·읽기·묻기·묵히기 중에서 그 낱말이 반드시 들어가게 적어라(예: "상대 입장 밑의 욕구를 처음으로 스스로 찾아냈다 — 읽기"). 맨 끝 줄에 (승승승 판단력 0718A).
+
+위기(자해 등) 신호가 보이면 틀을 멈추고 전문가·주변의 도움을 먼저 권하라. 의료·진단 표현 금지.
+처음 인사는 두 문장 이내.`;
+
+/* ───────── 상태 ───────── */
+let msgs=[], cases=[], busy=false, rec=null, recOn=false;
+const SS=window.speechSynthesis||null; /* 없는 환경(일부 미리보기)에서도 죽지 않게 */
+const $=id=>document.getElementById(id);
+const edge=$('edge'), cap=$('caption'), rep=$('reply'), st=$('status'), mic=$('mic');
+
+/* ───────── 저장 (아티팩트 전용 — 실패해도 진행) ───────── */
+const store={
+  async get(k){ try{const r=await window.storage.get(k);return r&&r.value;}catch(e){}
+    try{return localStorage.getItem(k);}catch(e){} return mem[k]; },
+  async set(k,v){ let ok=false;
+    try{const r=await window.storage.set(k,v); if(r)ok=true;}catch(e){}
+    try{localStorage.setItem(k,v); ok=true;}catch(e){}
+    mem[k]=v; return ok; },
+  async del(k){ try{await window.storage.delete(k);}catch(e){}
+    try{localStorage.removeItem(k);}catch(e){} delete mem[k]; }
+};
+const mem={}; let apiKey='';
+async function loadCases(){ try{cases=JSON.parse(await store.get('w4-cases-v0718'))||[];}catch(e){cases=[];} }
+async function saveCases(){ await store.set('w4-cases-v0718', JSON.stringify(cases)); }
+
+/* ───────── 말하기(TTS) ───────── */
+let ttsWarm=false;
+function warmTTS(){ /* 크롬은 사용자 터치 직후에만 소리길이 열림 — 무음 발화로 미리 열어둠 */
+  if(ttsWarm||!SS)return; ttsWarm=true;
+  try{const u=new SpeechSynthesisUtterance('\u00a0'); u.volume=0; SS.speak(u);}catch(e){}
+}
+if(SS&&SS.onvoiceschanged!==undefined){SS.onvoiceschanged=()=>{SS.getVoices();};}
+function speak(t){
+  if(!SS){setTimeout(()=>{rep.style.opacity=.28;},2600);return;}
+  try{
+    SS.cancel();
+    /* 문장 단위로 쪼개 발화 — 크롬 안드로이드의 긴 문장 끊김·무발화 회피 */
+    const parts=(t.replace(/\s+/g,' ').match(/[^.!?…。]+[.!?…。]?/g)||[t]).map(x=>x.trim()).filter(Boolean);
+    setTimeout(()=>{ /* cancel 직후 speak가 삼켜지는 크롬 버그 — 한 박자 쉬고 */
+      try{
+        SS.resume();
+        parts.forEach((pt,i)=>{
+          const u=new SpeechSynthesisUtterance(pt);
+          u.lang='ko-KR'; u.rate=1.02;
+          const v=SS.getVoices().find(v=>v.lang&&v.lang.startsWith('ko'));
+          if(v)u.voice=v;
+          if(i===0)u.onstart=()=>{edge.className='speak'; st.textContent='말하는 중';};
+          if(i===parts.length-1)u.onend=()=>{edge.className=''; st.textContent='';
+            setTimeout(()=>{rep.style.opacity=.28;},2600);};
+          SS.speak(u);
+        });
+      }catch(e){}
+    },150);
+  }catch(e){}
+}
+
+/* ───────── AI 호출 ───────── */
+async function ask(text){
+  if(busy)return; busy=true;
+  SS&&SS.cancel();
+  msgs.push({role:'user',content:text});
+  cap.textContent=''; edge.className='think'; st.textContent='생각 중';
+  rep.style.opacity=1; 
+  let sys=(MODE==='decide'?DECIDE:CARD);
+  if(cases.length){
+    sys+=`\n\n[지난 사례 카드]\n${cases[cases.length-1].text}\n지침: 사용자가 첫 화제를 꺼내면, 필요할 때 이 지난 결정의 복기(조정 신호가 켜졌는지)를 자연스럽게 먼저 살펴라.`;
+  }
+  try{
+    const hdr={'Content-Type':'application/json'};
+    if(apiKey){ hdr['x-api-key']=apiKey; hdr['anthropic-version']='2023-06-01';
+      hdr['anthropic-dangerous-direct-browser-access']='true'; }
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:hdr,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,
+        system:sys,messages:msgs})
+    });
+    const d=await r.json();
+    if(!r.ok){
+      const why = r.status===401 ? (apiKey?'키가 틀렸어요 — ⚙에서 다시 붙여넣어 주세요.':'대화 연결이 없어요 — 왼쪽 위 ⚙에 API 키를 넣어 주세요.')
+        : r.status===429 ? '오늘 한도에 닿았어요 — 잠시 뒤 다시, 또는 콘솔에서 한도 확인.'
+        : r.status===400 ? '요청 형식 오류(400) — 이 문구가 보이면 개발자에게 알려주세요.'
+        : `연결 오류(${r.status}) — 인터넷을 확인해 주세요.`;
+      msgs.pop(); rep.textContent=why; edge.className=''; busy=false; st.textContent=''; return;
+    }
+    const out=(d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim()
+      ||'연결이 잠시 어렵습니다. 다시 한 번 말씀해 주세요.';
+    msgs.push({role:'assistant',content:out});
+    rep.textContent=out; speak(out);
+    if(out.includes('(승승승 판단력')){
+      cases.push({t:Date.now(),text:out}); saveCases();
+      st.textContent='사례 카드 저장됨';
+    }
+  }catch(e){
+    msgs.pop();
+    rep.textContent=apiKey?'연결이 잠시 어렵네요 — 키·한도·인터넷을 확인해 주세요.':'대화 연결이 없어요. 클로드 앱 안에서 열거나, 왼쪽 위 ⚙에 API 키를 넣어 주세요.';
+    edge.className='';
+  }
+  busy=false; if(!(SS&&SS.speaking)){edge.className='';st.textContent='';}
+}
+
+/* ───────── 듣기(음성 인식) ───────── */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(SR){
+  rec=new SR(); rec.lang='ko-KR'; rec.interimResults=true; rec.continuous=false;
+  rec.onstart=()=>{recOn=true; mic.classList.add('on'); edge.className='listen'; st.textContent='듣는 중'; SS&&SS.cancel();};
+  rec.onresult=e=>{
+    let fin='',inter='';
+    for(const r of e.results){ (r.isFinal?fin+=r[0].transcript:inter=r[0].transcript); }
+    cap.textContent=inter||fin;
+    if(fin.trim()){ask(fin.trim());}
+  };
+  rec.onerror=e=>{
+    stopRec();
+    const k=e&&e.error;
+    if(k==='not-allowed'||k==='service-not-allowed'){
+      showType('마이크 권한이 막혀 있어요. 주소창 자물쇠 → 사이트 설정 → 마이크를 허용으로 바꾸고 새로고침해 주세요.');
+    }else if(k==='no-speech'){
+      showType('소리가 안 잡혔어요. 마이크를 다시 누르고 말씀해 주세요.');
+    }else if(k==='network'){
+      showType('음성 인식 서버에 연결이 안 돼요. 인터넷을 확인하시거나 아래 입력창을 쓰세요.');
+    }else if(k==='aborted'){
+      /* 사용자가 멈춤 — 안내 불필요 */
+    }else{
+      showType('음성 인식 오류('+(k||'알 수 없음')+'). 아래 입력창을 쓰세요.');
+    }
+  };
+  rec.onend=()=>stopRec();
+}else{ showType('이 브라우저는 음성 인식이 없어요 — 아래 입력창(키보드 마이크 가능)을 쓰세요.'); }
+
+function stopRec(){recOn=false;mic.classList.remove('on');
+  if(!busy&&!(SS&&SS.speaking)){edge.className='';st.textContent='';}}
+function showType(note){
+  $('typebar').classList.add('show');
+  if(note){rep.textContent=note;rep.style.opacity=1;}
+}
+
+mic.onclick=async ()=>{ warmTTS();
+  if(!rec){showType('이 브라우저는 음성 인식이 없어요 — 아래 입력창(키보드 마이크)을 쓰세요.');$('ti').focus();return;}
+  if(!location.protocol.startsWith('https')&&location.hostname!=='localhost'){
+    showType('주소가 https가 아니라 마이크가 규격상 막혀요. https 주소로 열어 주세요.');$('ti').focus();return;}
+  if(recOn){rec.stop();return;}
+  st.textContent='마이크 여는 중';
+  try{
+    if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
+      const s=await navigator.mediaDevices.getUserMedia({audio:true});
+      s.getTracks().forEach(x=>x.stop());
+    }
+  }catch(err){
+    stopRec();
+    showType('마이크 권한이 막혀 있어요. 주소창 자물쇠 → 사이트 설정 → 마이크를 허용으로 바꾸고 새로고침해 주세요.');
+    $('ti').focus(); return;
+  }
+  try{ rec.start(); }
+  catch(e){
+    if(String(e&&e.name)==='InvalidStateError'){ try{rec.stop();}catch(_){} setTimeout(()=>{try{rec.start();}catch(_){}} ,300); return; }
+    stopRec();
+    showType('마이크를 열지 못했어요('+(e&&e.name||'오류')+'). 크롬에서 열었는지 확인하시고, 안 되면 아래 입력창을 쓰세요.');
+    $('ti').focus();
+  }
+};
+
+/* 텍스트 폴백 */
+$('send').onclick=()=>{ warmTTS(); const v=$('ti').value.trim();if(v){$('ti').value='';ask(v);}};
+$('ti').addEventListener('keydown',e=>{if(e.key==='Enter')$('send').onclick();});
+
+/* ───────── 정리(사례 카드) ───────── */
+$('bCase').onclick=()=>{ if(!msgs.length){rep.textContent='먼저 이야기를 나눈 뒤에 정리할 수 있어요.';rep.style.opacity=1;return;}
+  ask('사례 카드로 정리해줘'); };
+
+/* ───────── 기록 시트 ───────── */
+function growthPanel(){
+  const forces=[['살핌','#7b5ea7'],['읽기','#2E74B5'],['묻기','#17a589'],['묵히기','#b9770e']];
+  const cnt={'살핌':0,'읽기':0,'묻기':0,'묵히기':0};
+  cases.forEach(c=>{ const m=(c.text.match(/오늘 자란 힘[\s\S]*/)||[''])[0];
+    forces.forEach(([n])=>{ if(m.includes(n)) cnt[n]++; }); });
+  const wrap=document.createElement('div');
+  const hd=document.createElement('div'); hd.className='note'; hd.style.marginBottom='12px';
+  hd.innerHTML='<b>판단력 성장</b> — 상담 '+cases.length+'회에서 자란 힘';
+  wrap.appendChild(hd);
+  const max=Math.max(1,...Object.values(cnt));
+  forces.forEach(([n,c])=>{
+    const row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:9px';
+    const lab=document.createElement('div'); lab.textContent=n; lab.style.cssText='width:44px;font-size:13px;color:#9aa1a8;flex:0 0 auto';
+    const track=document.createElement('div'); track.style.cssText='flex:1;height:9px;background:#14171a;border-radius:5px;overflow:hidden';
+    const bar=document.createElement('div'); bar.style.cssText='height:100%;border-radius:5px;transition:width .6s;width:'+(cnt[n]/max*100)+'%;background:'+c;
+    track.appendChild(bar);
+    const num=document.createElement('div'); num.textContent=cnt[n]; num.style.cssText='width:20px;text-align:right;font-size:12.5px;color:#5a6067;flex:0 0 auto';
+    row.appendChild(lab); row.appendChild(track); row.appendChild(num); wrap.appendChild(row);
+  });
+  const foot=document.createElement('div'); foot.className='note';
+  foot.style.cssText='margin-top:8px;font-size:12px;color:#5a6067';
+  foot.textContent='네 힘이 고르게 자랄수록 판단이 단단해집니다. 판단력은 이 넷의 총합이라 따로 세지 않습니다.';
+  wrap.appendChild(foot);
+  const rule=document.createElement('div'); rule.style.cssText='border-bottom:1px solid #22262b;margin:16px 0'; wrap.appendChild(rule);
+  return wrap;
+}
+
+$('bMode').onclick=()=>{
+  MODE=(MODE==='decide')?'counsel':'decide';
+  $('bMode').textContent=(MODE==='decide')?'상담으로':'판단 세션';
+  const m=(MODE==='decide')
+    ?'판단 세션을 시작할게요. 지금 마음이 0에서 10 중 몇쯤인가요?'
+    :'상담으로 돌아왔어요. 어떤 이야기든 편하게 들려주세요.';
+  msgs.push({role:'assistant',content:m});
+  rep.textContent=m; speak(m);
+};
+$('bLog').onclick=()=>{
+  const b=$('logBody'); b.innerHTML='';
+  if(cases.length){ b.appendChild(growthPanel()); }
+  if(cases.length){
+    const h=document.createElement('div'); h.className='note'; h.textContent='사례 카드';
+    h.style.marginBottom='10px'; b.appendChild(h);
+    cases.slice().reverse().forEach(c=>{
+      const d=document.createElement('div'); d.className='case'; d.textContent=c.text;
+      const cp=document.createElement('button'); cp.className='cc'; cp.textContent='복사';
+      cp.onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(c.text);cp.textContent='복사됨';};
+      d.appendChild(cp); b.appendChild(d);
+    });
+  }
+  msgs.forEach(m=>{const d=document.createElement('div');
+    d.className='msg '+(m.role==='user'?'u':'a'); d.textContent=m.content; b.appendChild(d);});
+  if(!msgs.length&&!cases.length){b.innerHTML='<div class="note">아직 기록이 없습니다.</div>';}
+  $('shLog').classList.add('show');
+};
+$('bInfo').onclick=()=>$('shInfo').classList.add('show');
+document.querySelectorAll('.close').forEach(x=>x.onclick=()=>$(x.dataset.x).classList.remove('show'));
+
+/* ───────── 시작 ───────── */
+(async()=>{
+  await loadCases();
+  apiKey=(await store.get('w4-key-v0718'))||'';
+  $('bKey').onclick=()=>{$('ki').value=apiKey; $('kSt').textContent=apiKey?'키 저장됨':''; $('shKey').classList.add('show');};
+  $('kSave').onclick=async()=>{apiKey=$('ki').value.trim(); await store.set('w4-key-v0718',apiKey);
+    $('kSt').textContent=apiKey?'저장했습니다 — 이제 이 파일 단독으로도 대화가 됩니다.':'키가 비어 있습니다.';};
+  $('kClear').onclick=async()=>{apiKey=''; $('ki').value=''; await store.del('w4-key-v0718'); $('kSt').textContent='지웠습니다.';};
+  setTimeout(()=>{$('hint').style.opacity=0;},7000);
+  const greet = cases.length
+    ? '다시 오셨네요. 지난번 정하신 일, 그 뒤 어떻게 되었나요?'
+    : '안녕하세요. 요즘 마음에 걸리는 결정이 있다면, 편하게 들려주세요.';
+  rep.textContent=greet;
+  CARD+=`\n\n[방금 사용자에게 건넨 첫 인사] "${greet}"`;
+})();
+</script>
+</body>
+</html>
